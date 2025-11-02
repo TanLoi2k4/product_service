@@ -1,6 +1,9 @@
 package com.tlcn.product_service.model;
 
 import lombok.*;
+
+import java.time.Instant;
+
 import org.springframework.data.annotation.Id;
 import org.springframework.data.elasticsearch.annotations.Document;
 import org.springframework.data.elasticsearch.annotations.Field;
@@ -36,4 +39,16 @@ public class ProductDocument {
 
     @Field(type = FieldType.Text) 
     private String keycloakId;
+
+    @Field(type = FieldType.Boolean)
+    private boolean isDeleted = false;
+
+    @Field(type = FieldType.Double)
+    private Double originalPriceBeforeFs; 
+
+    @Field(type = FieldType.Boolean)
+    private boolean isFlashSale = false; 
+
+    @Field(type = FieldType.Date) 
+    private Instant flashSaleEndTime;
 }
