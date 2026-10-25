@@ -2,17 +2,19 @@ package com.tlcn.product_service.repository;
 
 import com.tlcn.product_service.model.Product;
 
-import java.util.List;
 import java.util.Optional;
 
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.Pageable;
-
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
+import jakarta.persistence.LockModeType;
 
 public interface ProductRepository extends JpaRepository<Product, Long> {
-    Page<Product> findByKeycloakIdAndIsDeletedFalse(String keycloakId, Pageable pageable);
     Optional<Product> findByIdAndIsDeletedFalse(Long id);
-    Page<Product> findByKeycloakIdAndIsDeletedTrue(String keycloakId, Pageable pageable);
-    List<Product> findByIsDeletedFalse();
+
+    
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT p FROM Product p WHERE p.id = :id")
+    Optional<Product> findByIdWithLock(@Param("id") Long id);
 }

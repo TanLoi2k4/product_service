@@ -25,7 +25,7 @@ public class ProductDocument {
     @Field(type = FieldType.Text, analyzer = "standard")
     private String description;
 
-    @Field(type = FieldType.Text, analyzer = "standard")
+    @Field(type = FieldType.Keyword)
     private String category;
 
     @Field(type = FieldType.Double)
@@ -34,10 +34,17 @@ public class ProductDocument {
     @Field(type = FieldType.Integer)
     private Integer stock;
 
-    @Field(type = FieldType.Text)
+    @Field(type = FieldType.Integer)
+    @Builder.Default
+    private Integer soldCount = 0;
+
+    @Field(type = FieldType.Double)
+    private Double rating = 0.0;
+
+    @Field(type = FieldType.Keyword, index = false) 
     private String imageUrl;
 
-    @Field(type = FieldType.Text) 
+    @Field(type = FieldType.Keyword)
     private String keycloakId;
 
     @Field(type = FieldType.Boolean)
@@ -49,6 +56,6 @@ public class ProductDocument {
     @Field(type = FieldType.Boolean)
     private boolean isFlashSale = false; 
 
-    @Field(type = FieldType.Date) 
+    @Field(type = FieldType.Date)
     private Instant flashSaleEndTime;
 }

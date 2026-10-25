@@ -1,7 +1,6 @@
 package com.tlcn.product_service.exception;
 
 import com.tlcn.product_service.dto.ResponseDTO;
-import com.tlcn.product_service.service.ProductService;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
@@ -9,24 +8,59 @@ import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import lombok.extern.slf4j.Slf4j;
+import java.util.stream.Collectors;
 
 @RestControllerAdvice
+@Slf4j
 public class GlobalExceptionHandler {
 
-    @ExceptionHandler(ProductService.CustomException.class)
-    public ResponseEntity<ResponseDTO<Void>> handleCustomException(ProductService.CustomException ex) {
-        return ResponseEntity.badRequest().body(new ResponseDTO<>(false, ex.getMessage(), null));
+    @ExceptionHandler(BusinessException.class)
+    public ResponseEntity<ResponseDTO<Void>> handleBusiness(BusinessException ex) {
+        log.error("BusinessException: {}", ex.getMessage());
+        HttpStatus status = ex.getStatus() != null ? ex.getStatus() : HttpStatus.INTERNAL_SERVER_ERROR;
+        return ResponseEntity.status(status).body(new ResponseDTO<>(false, ex.getMessage(), null));
+    }
+
+    @ExceptionHandler(ResourceNotFoundException.class)
+    public ResponseEntity<ResponseDTO<Void>> handleNotFound(ResourceNotFoundException ex) {
+        log.warn("Resource not found: {}", ex.getMessage());
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(new ResponseDTO<>(false, ex.getMessage(), null));
+    }
+
+    @ExceptionHandler(UnauthorizedException.class)
+    public ResponseEntity<ResponseDTO<Void>> handleUnauthorized(UnauthorizedException ex) {
+        log.warn("Unauthorized: {}", ex.getMessage());
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(new ResponseDTO<>(false, ex.getMessage(), null));
+    }
+
+    @ExceptionHandler(ForbiddenException.class)
+    public ResponseEntity<ResponseDTO<Void>> handleForbidden(ForbiddenException ex) {
+        log.warn("Forbidden: {}", ex.getMessage());
+        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(new ResponseDTO<>(false, ex.getMessage(), null));
+    }
+
+    @ExceptionHandler(PermissionDeniedException.class)
+    public ResponseEntity<ResponseDTO<Void>> handlePermissionDenied(PermissionDeniedException ex) {
+        log.warn("Permission denied: {}", ex.getMessage());
+        return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                .body(new ResponseDTO<>(false, ex.getMessage(), null));
+    }
+
+    @ExceptionHandler(ReviewAlreadyExistsException.class)
+    public ResponseEntity<ResponseDTO<Void>> handleReviewAlreadyExists(ReviewAlreadyExistsException ex) {
+        log.warn("Review already exists: {}", ex.getMessage());
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+                .body(new ResponseDTO<>(false, ex.getMessage(), null));
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
-    public ResponseEntity<ResponseDTO<Void>> handleValidationException(MethodArgumentNotValidException ex) {
-        StringBuilder errorMsg = new StringBuilder();
-        ex.getBindingResult().getAllErrors().forEach(error -> {
-            if (error instanceof FieldError) {
-                errorMsg.append(((FieldError) error).getField()).append(": ").append(error.getDefaultMessage()).append("; ");
-            }
-        });
-        return ResponseEntity.badRequest().body(new ResponseDTO<>(false, errorMsg.toString(), null));
+    public ResponseEntity<ResponseDTO<Void>> handleValidation(MethodArgumentNotValidException ex) {
+        String errors = ex.getBindingResult().getFieldErrors().stream()
+                .map(FieldError::getDefaultMessage)
+                .collect(Collectors.joining(", "));
+        log.warn("Validation failed: {}", errors);
+        return ResponseEntity.badRequest().body(new ResponseDTO<>(false, errors, null));
     }
 
     @ExceptionHandler(AccessDeniedException.class)

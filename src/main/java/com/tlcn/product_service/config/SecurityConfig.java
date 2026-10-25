@@ -4,6 +4,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
@@ -33,41 +34,66 @@ public class SecurityConfig {
 
             //2 Cấu hình quyền truy cập (Authorization rules)
             .authorizeHttpRequests(auth -> auth
-                // Public endpoints (cho người dùng xem sản phẩm)
-                .requestMatchers(
-                    "/api/products/{id}",
-                    "/api/products/search",
-                    "/api/products/vendor_id",
-                    "/api/products/vendor_id/search",
-                    "/actuator/**"
+                // Public product browsing endpoints
+                .requestMatchers(HttpMethod.GET,
+                    "/categories",
+                    "/categories/**",
+                    "/products",
+                    "/products/*",
+                    "/products/*/similar",
+                    "/products/category/**",
+                    "/products/flash-sale",
+                    "/products/autocomplete",
+                    "/products/price-range",
+                    "/products/advanced",
+                    "/products/*/reviews",
+                    "/products/vendors/ratings",
+                    "/products/vendors/top-rated"
                 ).permitAll()
 
-                // Các endpoint còn lại yêu cầu authentication
-                // Role check sẽ thực hiện bằng @PreAuthorize trong Controller
-                .requestMatchers("/api/products/**").authenticated()
+                // Browse products by vendor (customer storefront) — POST body, not GET
+                .requestMatchers(HttpMethod.POST, "/products/vendors").permitAll()
 
-                // Mọi request khác ngoài /api/products/** cũng yêu cầu xác thực
+                // Admin product & category management endpoints
+                .requestMatchers("/products/admin/**").hasAnyRole("ADMIN", "SUPER_ADMIN")
+
+                .requestMatchers(HttpMethod.POST, "/products/*/views").authenticated()
+
+                // Review creation/update/delete/reply require auth and role checks in controller
+                .requestMatchers(HttpMethod.POST, "/products/reviews", "/products/reviews/**").authenticated()
+                .requestMatchers(HttpMethod.PUT, "/products/reviews/**").authenticated()
+                .requestMatchers(HttpMethod.DELETE, "/products/reviews/**").authenticated()
+
+                // Vendor-only product management endpoints
+                .requestMatchers("/products/vendor/**").hasRole("VENDOR")
+
+                // All other product endpoints require authentication
+                .requestMatchers("/products/**").authenticated()
+
+                .requestMatchers(HttpMethod.GET, "/recommendations/me").authenticated()
+
                 .anyRequest().authenticated()
             )
 
-            //3 Cấu hình Keycloak JWT Resource Server
             .oauth2ResourceServer(oauth2 -> oauth2
                 .jwt(jwt -> jwt.jwtAuthenticationConverter(jwtAuthConverter))
-            )
+                .authenticationEntryPoint(new HttpStatusEntryPoint(HttpStatus.UNAUTHORIZED))
 
-            //4 Stateless session (chuẩn REST API)
+            )
+            
+            // 5. Set session management to stateless (Crucial for JWT/REST API)
             .sessionManagement(session -> session
                 .sessionCreationPolicy(SessionCreationPolicy.STATELESS)
             )
-
-            //5 Exception Handling (trả 401 thay vì redirect)
+            
+            // 6. CRITICAL FIX: Handle exceptions to return 401 JSON instead of searching for a static page
             .exceptionHandling(exceptions -> exceptions
                 .authenticationEntryPoint(new HttpStatusEntryPoint(HttpStatus.UNAUTHORIZED))
             )
-
-            //2 Filter chặn token trong blacklist (logout)
+            
+            // 7. Add custom JWT blacklist filter
             .addFilterBefore(new JwtBlacklistFilter(redisTemplate), BasicAuthenticationFilter.class);
-
+            
         return http.build();
     }
 }

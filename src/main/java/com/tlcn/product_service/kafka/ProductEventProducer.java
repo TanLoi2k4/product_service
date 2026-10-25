@@ -1,55 +1,123 @@
 package com.tlcn.product_service.kafka;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import com.tlcn.product_service.dto.kafka.StockReservationResponse;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.apache.kafka.clients.producer.ProducerRecord;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Component;
 
+import java.nio.charset.StandardCharsets;
+import java.time.Instant;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.UUID;
 
 @Component
+@RequiredArgsConstructor
+@Slf4j
 public class ProductEventProducer {
 
-    private static final Logger log = LoggerFactory.getLogger(ProductEventProducer.class);
+    private final KafkaTemplate<String, Object> kafkaTemplate;
 
-    @Autowired
-    private KafkaTemplate<String, String> kafkaTemplate;
+    @Value("${spring.kafka.topics.stock-reservation-response:stock-reservation-response}")
+    private String stockReservationResponseTopic;
 
-    @Autowired
-    private ObjectMapper objectMapper;
+    @Value("${spring.kafka.topics.inventory-update:inventory-update}")
+    private String inventoryUpdateTopic;
 
-    public void sendStockReservationResponse(Long orderId, Long productId, int newStock, String status) {
-        Map<String, Object> data = new HashMap<>();
-        data.put("orderId", orderId);
-        data.put("productId", productId);
-        data.put("newStock", newStock);
-        data.put("status", status); // SUCCESS hoặc FAILED
-        try {
-            String message = objectMapper.writeValueAsString(data);
-            // Sử dụng sendAndForget, log lỗi nếu thất bại.
-            kafkaTemplate.send(new ProducerRecord<>("stock-reservation-response", message));
-            log.info("Sent stock-reservation-response: orderId={}, status={}", orderId, status);
-        } catch (Exception e) {
-            log.error("Failed to send stock reservation response for orderId={}: {}", orderId, e.getMessage());
+    @Value("${spring.kafka.topics.product-price-update:product-price-update}")
+    private String productPriceUpdateTopic;
+
+    public void sendStockReservationResponse(StockReservationResponse response) {
+        if (response == null) {
+            return;
         }
+
+        String messageId = UUID.randomUUID().toString();
+        long timestampMs = Instant.now().toEpochMilli();
+
+        String key = response.getOrderId() != null ? String.valueOf(response.getOrderId()) : null;
+
+        ProducerRecord<String, Object> record = new ProducerRecord<>(
+            stockReservationResponseTopic,
+            key,
+            response
+        );
+        record.headers().add("messageId", messageId.getBytes(StandardCharsets.UTF_8));
+        record.headers().add("timestamp", String.valueOf(timestampMs).getBytes(StandardCharsets.UTF_8));
+
+        kafkaTemplate.send(record);
+        log.info("Sent stock-reservation-response: messageId={}, orderId={}, productId={}, success={} -> topic={}",
+            messageId,
+            response.getOrderId(),
+            response.getProductId(),
+            response.isSuccess(),
+            stockReservationResponseTopic
+        );
     }
 
     public void sendInventoryUpdate(Long productId, int newStock, String source) {
-        Map<String, Object> data = new HashMap<>();
-        data.put("productId", productId);
-        data.put("newStock", newStock);
-        data.put("source", source);
-        try {
-            String message = objectMapper.writeValueAsString(data);
-            // Sử dụng sendAndForget, log lỗi nếu thất bại.
-            kafkaTemplate.send(new ProducerRecord<>("inventory-update", message));
-            log.info("Sent inventory-update: productId={}, newStock={}, source={}", productId, newStock, source);
-        } catch (Exception e) {
-            log.error("Failed to send inventory update for productId={}: {}", productId, e.getMessage());
+        if (productId == null) {
+            return;
         }
+
+        String messageId = UUID.randomUUID().toString();
+        long timestampMs = Instant.now().toEpochMilli();
+
+        Map<String, Object> payload = new HashMap<>();
+        payload.put("productId", productId);
+        payload.put("newStock", newStock);
+        payload.put("source", source);
+        payload.put("timestamp", timestampMs);
+
+        ProducerRecord<String, Object> record = new ProducerRecord<>(
+            inventoryUpdateTopic,
+            String.valueOf(productId),
+            payload
+        );
+        record.headers().add("messageId", messageId.getBytes(StandardCharsets.UTF_8));
+        record.headers().add("timestamp", String.valueOf(timestampMs).getBytes(StandardCharsets.UTF_8));
+
+        kafkaTemplate.send(record);
+        log.info("Sent inventory-update: messageId={}, productId={}, newStock={}, source={} -> topic={}",
+            messageId,
+            productId,
+            newStock,
+            source,
+            inventoryUpdateTopic
+        );
+    }
+
+    public void sendPriceUpdate(Long productId, Double newPrice, String source) {
+        if (productId == null) {
+            return;
+        }
+
+        String messageId = UUID.randomUUID().toString();
+        long timestampMs = Instant.now().toEpochMilli();
+
+        Map<String, Object> payload = new HashMap<>();
+        payload.put("productId", productId);
+        payload.put("newPrice", newPrice);
+        payload.put("source", source);
+        payload.put("timestamp", timestampMs);
+
+        ProducerRecord<String, Object> record = new ProducerRecord<>(
+            productPriceUpdateTopic,
+            String.valueOf(productId),
+            payload
+        );
+        record.headers().add("messageId", messageId.getBytes(StandardCharsets.UTF_8));
+        record.headers().add("timestamp", String.valueOf(timestampMs).getBytes(StandardCharsets.UTF_8));
+
+        kafkaTemplate.send(record);
+        log.info("Sent product-price-update: messageId={}, productId={}, newPrice={} -> topic={}",
+            messageId,
+            productId,
+            newPrice,
+            productPriceUpdateTopic
+        );
     }
 }

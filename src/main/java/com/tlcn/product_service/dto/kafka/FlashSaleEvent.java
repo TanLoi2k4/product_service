@@ -1,4 +1,4 @@
-package com.tlcn.product_service.dto;
+package com.tlcn.product_service.dto.kafka;
 
 import lombok.AllArgsConstructor;
 import lombok.Data;

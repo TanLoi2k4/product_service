@@ -51,31 +51,30 @@ spring:
     instance:
       prefer-ip-address: true
       instance-id: ${spring.application.name}:${spring.cloud.client.ip-address}:${server.port}
+      ip-address: ${spring.cloud.client.ip-address}
 
   kafka:
-    bootstrap-servers: localhost:9092 # Phase 5: Support multi-broker (e.g., broker1:9092,broker2:9092)
+    bootstrap-servers: localhost:9092
     producer:
       key-serializer: org.apache.kafka.common.serialization.StringSerializer
       value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
-      properties:
-        acks: all # Ensure durability (Phase 1.3)
-        retries: 3 # Handle transient errors (Phase 4.2)
-        enable.idempotence: true # Prevent duplicates (Phase 4.2)
-        batch.size: 16384 # Optimize throughput (Phase 4.2)
-        linger.ms: 1 # Low latency (Phase 4.2)
-        compression.type: gzip # Optimize network usage (Phase 4.2)
     consumer:
-      group-id: product-service-group # Specific to product-service
-      auto-offset-reset: earliest # Process all messages for inventory consistency (Phase 1.3)
+      group-id: product-service-group
+      auto-offset-reset: earliest
+      enable-auto-commit: false
       key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
       value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
       properties:
-        spring.json.trusted.packages: java.util.*,com.tlcn.* # Allow DTO deserialization (Phase 4.2)
-        max.poll.records: 100 # Optimize polling (Phase 4.2)
-        enable.auto.commit: false # Manual acknowledgment for reliability (Phase 1.3)
-        isolation.level: read_committed # Ensure consistency (Phase 4.2)
-        session.timeout.ms: 10000 # Consumer timeout (Phase 4.2)
-        heartbeat.interval.ms: 3000 # Consumer heartbeat (Phase 4.2)
+        spring.json.trusted.packages: java.util.*,com.tlcn.*
+    listener:
+      ack-mode: manual_immediate
+    topics:
+      stock-reservation-request: stock-reservation-request
+      stock-rollback-request: stock-rollback-request
+      stock-reservation-response: stock-reservation-response
+      inventory-update: inventory-update
+      product-price-update: product-price-update
+      flash-sale: flash-sale
 
 management:
   endpoints:
@@ -91,6 +90,15 @@ cloudinary:
   api_key: 267982487387328
   api_secret: Lwg2biD9-NbrJ48JQO8ZRKaoN8M
   folder: products
+  review-folder: reviews
+
+services:
+  order-service:
+    base-url: http://localhost:8084
+  customer-service:
+    base-url: http://localhost:8083
+  communication-service:
+    base-url: http://localhost:8089
 
 logging:
   level:
